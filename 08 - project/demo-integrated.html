@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+
+	<head>
+		<meta charset="utf-8">
+		<title>Demo - Integrated</title>
+		<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+		<style type="text/css">
+			body {
+				margin: 0 auto;
+				max-width: 40em;
+				width: 88%;
+			}
+
+			label,
+			input,
+			textarea {
+				display: block;
+				width: 100%;
+			}
+
+			input,
+			textarea {
+				margin-bottom: 1em;
+			}
+
+			textarea {
+				min-height: 12em;
+			}
+
+			.comment {
+				border-bottom: 1px solid #e5e5e5;
+				padding-bottom: 1.5em;
+			}
+		</style>
+	</head>
+
+	<body>
+
+		<h1>This is a blog post</h1>
+		<p>Pretty exciting, huh?</p>
+		<p>I'm sharing all sorts of ideas. I'm sure people have lots of polite and respectful things they'd like to add to the discussion.</p>
+
+		<h2>Comments</h2>
+
+		<div id="comments">Loading comments...</div>
+
+		<h3>Add a Comment</h3>
+		<form id="add-comment">
+			<label for="name">Your Name</label>
+			<input type="text" name="name" id="name">
+
+			<label for="url">URL (optional)</label>
+			<input type="url" name="url" id="url">
+
+			<label for="comment">Comment</label>
+			<textarea name="comment" id="comment"></textarea>
+
+			<p><button>Add Your Comment</button></p>
+
+			<p id="form-status" aria-live="polite"></p>
+		</form>
+
+
+		<script>
+			// The API endpoint
+			let endpoint = 'https://guide-comments.gomakethings.workers.dev';
+
+			// Get the DOM elements
+			let comments = document.querySelector('#comments');
+			let commentForm = document.querySelector('#add-comment');
+			let formStatus = document.querySelector('#form-status');
+
+			/**
+			 * Sanitize an HTML string
+			 * @param  {String}          str   The HTML string to sanitize
+			 * @param  {Boolean}         nodes If true, returns HTML nodes instead of a string
+			 * @return {String|NodeList}       The sanitized string or nodes
+			 */
+			function cleanHTML (str, nodes) {
+
+				/**
+				 * Convert the string to an HTML document
+				 * @return {Node} An HTML document
+				 */
+				function stringToHTML () {
+					let parser = new DOMParser();
+					let doc = parser.parseFromString(str, 'text/html');
+					return doc.body || document.createElement('body');
+				}
+
+				/**
+				 * Remove <script> elements
+				 * @param  {Node} html The HTML
+				 */
+				function removeScripts (html) {
+					let scripts = html.querySelectorAll('script');
+					for (let script of scripts) {
+						script.remove();
+					}
+				}
+
+				/**
+				 * Check if the attribute is potentially dangerous
+				 * @param  {String}  name  The attribute name
+				 * @param  {String}  value The attribute value
+				 * @return {Boolean}       If true, the attribute is potentially dangerous
+				 */
+				function isPossiblyDangerous (name, value) {
+					let val = value.replace(/\s+/g, '').toLowerCase();
+					if (['src', 'href', 'xlink:href'].includes(name)) {
+						if (val.includes('javascript:') || val.includes('data:')) return true;
+					}
+					if (name.startsWith('on')) return true;
+				}
+
+				/**
+				 * Remove potentially dangerous attributes from an element
+				 * @param  {Node} elem The element
+				 */
+				function removeAttributes (elem) {
+
+					// Loop through each attribute
+					// If it's dangerous, remove it
+					let atts = elem.attributes;
+					for (let {name, value} of atts) {
+						if (!isPossiblyDangerous(name, value)) continue;
+						elem.removeAttribute(name);
+					}
+
+				}
+
+				/**
+				 * Remove dangerous stuff from the HTML document's nodes
+				 * @param  {Node} html The HTML document
+				 */
+				function clean (html) {
+					let nodes = html.children;
+					for (let node of nodes) {
+						removeAttributes(node);
+						clean(node);
+					}
+				}
+
+				// Convert the string to HTML
+				let html = stringToHTML();
+
+				// Sanitize it
+				removeScripts(html);
+				clean(html);
+
+				// If the user wants HTML nodes back, return them
+				// Otherwise, pass a sanitized string back
+				return nodes ? html.childNodes : html.innerHTML;
+
+			}
+
+			/**
+			 * Get the HTML for a comment
+			 * @param  {Object} comment The comment data
+			 * @return {String}         The HTML string
+			 */
+			function getCommentHTML (comment) {
+				return `
+					<article class="comment">
+						<h3>
+							${comment.url ? `<a href="${comment.url}">` : ''}
+								${comment.name}
+							${comment.url ? `</a>` : ''}
+						</h3>
+						${comment.comment}
+					</article>`;
+			}
+
+			/**
+			 * Render comments into the UI
+			 * @param  {Array} data The comment data
+			 */
+			function renderComments(data) {
+
+				// If there are no comments to render
+				if (!data.length) {
+					renderNoComments();
+					return;
+				}
+
+				// Otherwise, create comment HTML
+				let html = data.map(function (comment) {
+					return getCommentHTML(comment);
+				}).join('');
+
+				// Inject comments into the DOM
+				comments.innerHTML = cleanHTML(html);
+
+			}
+
+			/**
+			 * Show a message when there aren't any comments to display
+			 */
+			function renderNoComments () {
+				comments.innerHTML = `<p>There aren't any comments yet. Want to be the first? Add yours below.</p>`;
+			}
+
+			/**
+			 * Get comments from the API
+			 *
+			 * Expected API response:
+
+				[
+					{
+						name: "Commenter Name",
+						url: "https://my-url.com",
+						comment: "My awesome comment!"
+					}
+				]
+
+			 */
+			function getComments () {
+				fetch(`${endpoint}?key=${encodeURIComponent(window.location.pathname)}`).then(function (response) {
+					if (response.ok) {
+						return response.json();
+					}
+					throw response.status;
+				}).then(function (data) {
+					renderComments(data);
+				}).catch(function (error) {
+					console.warn(error);
+					renderNoComments();
+				});
+			}
+
+			/**
+			 * Serialize all form data into an object
+			 * @param  {FormData} data The FormData object to serialize
+			 * @return {String}        The serialized form data
+			 */
+			function serialize (data) {
+				let obj = {};
+				for (let [key, value] of data) {
+					if (obj[key] !== undefined) {
+						if (!Array.isArray(obj[key])) {
+							obj[key] = [obj[key]];
+						}
+						obj[key].push(value);
+					} else {
+						obj[key] = value;
+					}
+				}
+				return obj;
+			}
+
+			/**
+			 * Show a form status message
+			 * @param  {String} msg The message to show
+			 */
+			function showStatus (msg) {
+				formStatus.textContent = msg;
+			}
+
+			/**
+			 * Render a comment into the UI
+			 * @param  {Object} comment The comment
+			 */
+			function renderComment (comment) {
+
+				// If the comments element has no comments yet, clear the message
+				if (!comments.querySelector('article')) {
+					comments.innerHTML = '';
+				}
+
+				// Add the comment
+				let html = cleanHTML(getCommentHTML(comment), true);
+				comments.append(...html);
+
+			}
+
+			/**
+			 * Add the comment to the database and UI
+			 * @param {Object} comment The comment data
+			 */
+			function addComment (comment) {
+
+				// Add the page to the comment data
+				comment.key = window.location.pathname;
+
+				// Show a submitting status and disable the form
+				showStatus('Adding your comment...');
+				commentForm.setAttribute('data-submitting', '');
+
+				// Submit the comment to the API
+				// If successful, render it into the UI and clear the form
+				// Otherwise, show an error message
+				fetch(endpoint, {
+					method: 'POST',
+					body: JSON.stringify(comment),
+					headers: {
+						'Content-Type': 'application/json'
+					}
+				}).then(function (response) {
+					if (response.ok) {
+						renderComment(comment);
+						commentForm.reset();
+						showStatus('Thanks for commenting!');
+						return;
+					}
+					throw response.status;
+				}).catch(function (error) {
+					console.warn(error);
+					showStatus('Unable to add your comment at this time. Sorry!');
+				}).finally(function () {
+					commentForm.removeAttribute('data-submitting');
+				});
+
+			}
+
+			/**
+			 * Listen for submit events
+			 * @param  {Event} event [description]
+			 */
+			function submitHandler (event) {
+
+				// Stop the form from reloading the page
+				event.preventDefault();
+
+				// If the form is already submitting, don't submit again
+				if (commentForm.hasAttribute('data-submitting')) return;
+
+				// Get the form data
+				let data = serialize(new FormData(event.target));
+
+				// If fields are missing, show error message
+				if (!data.name.trim().length || !data.comment.trim().length) {
+					showStatus('Please include a name and comment.');
+					return;
+				}
+
+				// Otherwise, add the comment
+				addComment(data);
+
+			}
+
+			// Fetch the comments for this page
+			getComments();
+
+			// Listen for form submissions
+			commentForm.addEventListener('submit', submitHandler);
+		</script>
+	</body>
+</html>

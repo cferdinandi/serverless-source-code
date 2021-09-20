@@ -53,6 +53,10 @@ async function handleRequest(request) {
 				{
 					"name": "Merlin",
 					"expiration": 1234,
+				},
+				{
+					"name": "Radagast",
+					"expiration": 1234,
 				}
 			],
 			"list_complete": false,

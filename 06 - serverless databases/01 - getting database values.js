@@ -36,28 +36,33 @@ async function handleRequest(request) {
 		});
 	}
 
-	// Get the request body
-	let params = new URL(request.url).searchParams;
-	let key = params.get('key');
+	// Handle the GET method
+	if (request.method === 'GET') {
 
-	// Get the wizard data
-	let wizard = await WIZARDS.get(key, {type: 'json'});
+		// Get the request body
+		let params = new URL(request.url).searchParams;
+		let key = params.get('key');
 
-	// If there's no wizard data
-	if (wizard === null) {
-		return new Response('Wizard not found', {
-			status: 404,
+		// Get the wizard data
+		let wizard = await WIZARDS.get(key, {type: 'json'});
+
+		// If there's no wizard data
+		if (wizard === null) {
+			return new Response('Wizard not found', {
+				status: 404,
+				headers: headers
+			});
+		}
+
+		// Otherwise, return the wizard data
+		return new Response(JSON.stringify({
+			wizard: wizard
+		}), {
+			status: 200,
 			headers: headers
 		});
-	}
 
-	// Otherwise, return the wizard data
-	return new Response(JSON.stringify({
-		wizard: wizard
-	}), {
-		status: 200,
-		headers: headers
-	});
+	}
 
 }
 

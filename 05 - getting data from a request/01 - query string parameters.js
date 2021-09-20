@@ -37,7 +37,7 @@ async function handleRequest(request) {
 		});
 	}
 
-	// Get the request body
+	// Get the query parameters
 	let params = new URL(request.url).searchParams;
 	let key = params.get('key');
 

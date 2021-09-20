@@ -45,7 +45,7 @@ async function handleRequest(request) {
 		});
 	}
 
-	// Get the first 30 wizard keys
+	// Get the first 30 wizard keys that start with M
 	/*
 
 		{
@@ -60,7 +60,10 @@ async function handleRequest(request) {
 		}
 
 	 */
-	let wizards = WIZARDS.list({limit: 30});
+	let wizards = WIZARDS.list({
+		prefix: 'M',
+		limit: 30
+	});
 
 	// Get the next set of keys
 	let wizardsNext = WIZARDS.list({cursor: '6Ck1la0VxJ0djhidm1MdX2FyD'});
